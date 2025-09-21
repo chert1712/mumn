@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>อาณาจักรแฟนซี - เกมเศรษฐี (Single File)</title>
+  <style>
+    :root{--bg:#071024;--panel:#081422;--accent:#9b5cf6;--muted:#9fb4c8;--card:#0b1726}
+    *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#031220 0%,#06162a 100%);color:#e6eef8;display:flex;justify-content:center;padding:18px}
+    .wrap{width:1100px;max-width:100%;display:grid;grid-template-columns:720px 1fr;gap:18px}
+    .board-wrap{background:linear-gradient(180deg,#071827,#051022);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    .board{width:700px;height:700px;display:grid;grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);gap:6px;border-radius:8px;background:linear-gradient(180deg,#071827,#041424)}
+    .cell{background:linear-gradient(180deg,#0b1723,#06111a);border-radius:6px;padding:6px;display:flex;flex-direction:column;justify-content:space-between;font-size:12px}
+    .cell.corner{display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+    .cell .title{font-size:11px;color:var(--muted);}
+    .cell .price{font-size:11px;color:#cbe8ff}
+    .cell.property .bar{height:8px;border-radius:6px;margin-top:6px}
+    .tokens{display:flex;gap:6px}
+    .token{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px}
+    .p1{background:#ef4444}
+    .p2{background:#3b82f6}
+    .panel{display:flex;flex-direction:column;gap:12px}
+    .card{background:linear-gradient(180deg,#051222,#03101a);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;font-weight:700;color:#fff;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .log{height:200px;overflow:auto;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px}
+    .players{display:flex;flex-direction:column;gap:8px}
+    .player{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .small{font-size:12px;color:var(--muted)}
+    .board-center{grid-column:4/9;grid-row:4/9;border-radius:6px;background:linear-gradient(180deg,#071022,#0a1630);display:flex;align-items:center;justify-content:center}
+    .center-content{font-size:22px;color:var(--muted);text-align:center}
+    .prop-list{display:flex;flex-wrap:wrap;gap:6px}
+    .prop-item{padding:6px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:12px}
+    .dice{display:flex;gap:6px;align-items:center}
+    .die{width:46px;height:46px;border-radius:6px;background:#0b1220;display:grid;place-items:center;font-size:18px;border:1px solid rgba(255,255,255,0.03)}
+    .flex-row{display:flex;gap:8px;align-items:center}
+    @media(max-width:1100px){.wrap{grid-template-columns:1fr}}    
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small">ผู้เล่นปัจจุบัน</div>
+            <div id="currentPlayer" style="font-weight:800;font-size:18px">Player 1</div>
+          </div>
+          <div>
+            <div class="small">รอบ/สถานะ</div>
+            <div id="status" style="font-weight:700">Ready</div>
+          </div>
+        </div>
+        <div style="margin-top:10px" class="controls">
+          <div class="dice"><div class="die" id="die1">-</div><div class="die" id="die2">-</div></div>
+          <button id="rollBtn">ทอย 2 ลูก</button>
+          <button id="endBtn" class="secondary">จบเทิร์น</button>
+          <button id="buyBtn" class="secondary">ซื้อที่</button>
+          <button id="upgradeBtn" class="secondary">อัปเกรด</button>
+          <button id="freeTripBtn" class="secondary">เที่ยว (Free Trip)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="small">ผู้เล่น</div>
+        <div class="players" id="players"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div class="small">ประวัติการเล่น</div><div id="diceSum">-</div></div>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="card">
+        <div class="small">ที่ดิน (คลิกดูรายละเอียด)</div>
+        <div id="propList" class="prop-list"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div class="small">การ์ด: สมบัติในบ้าน / ดวงดี-ร้าย</div><div id="cardCount">Treasure: 10 | Fate: 10</div></div>
+        <div style="margin-top:8px;display:flex;gap:6px"><button id="drawTreasure" class="secondary">จั่วสมบัติ</button><button id="drawFate" class="secondary">จั่วดวง</button></div>
+      </div>
+
+      <div class="card" style="text-align:center;font-size:12px;color:var(--muted)">Designed by Chester - Fantasy Monopoly Prototype</div>
+    </div>
+  </div>
+
+<script>
+// ======= Game Data & Config =======
+const START_BONUS = 200;
+const JAIL_FEE = 100;
+const FREE_TRIP_ENABLED = true;
+const INITIAL_MONEY = 1500;
+
+// Mapping of 44 positions (1..44). 4 corners: 1 Start, 12 Jail, 23 Tax, 34 FreeTrip
+const BOARD_MAP = [
+  {type:'corner', name:'Start'}, //1
+  {type:'property', name:'หมู่บ้านเอลฟ์', buy:100, rent:20, upHouse:200, rentHouse:50, upHotel:400, rentHotel:220},//2
+  {type:'treasure', name:'สมบัติในบ้าน'},//3
+  {type:'property', name:'ป่าเวทย์มนตร์', buy:120, rent:24, upHouse:200, rentHouse:60, upHotel:400, rentHotel:240},//4
+  {type:'fate', name:'ดวงดี-ดวงร้าย'},//5
+  {type:'property', name:'เหมืองแคระ', buy:160, rent:32, upHouse:220, rentHouse:80, upHotel:420, rentHotel:280},//6
+  {type:'taxsmall', name:'ภาษีย่อย', amount:100},//7
+  {type:'property', name:'สวนคริสตัล', buy:220, rent:44, upHouse:260, rentHouse:110, upHotel:460, rentHotel:340},//8
+  {type:'treasure', name:'สมบัติในบ้าน'},//9
+  {type:'property', name:'บ่อน้ำศักดิ์สิทธิ์', buy:140, rent:28, upHouse:220, rentHouse:70, upHotel:420, rentHotel:260},//10
+  {type:'property', name:'ตลาดเวทย์', buy:200, rent:40, upHouse:240, rentHouse:100, upHotel:440, rentHotel:320},//11
+  {type:'corner', name:'คุก'},//12
+  {type:'property', name:'ป่าเห็ดเรืองแสง', buy:300, rent:56, upHouse:280, rentHouse:140, upHotel:480, rentHotel:400},//13
+  {type:'treasure', name:'สมบัติในบ้าน'},//14
+  {type:'property', name:'ท่าเรือเอลฟ์', buy:280, rent:52, upHouse:280, rentHouse:130, upHotel:480, rentHotel:380},//15
+  {type:'fate', name:'ดวงดี-ดวงร้าย'},//16
+  {type:'property', name:'ทางเดินหินโบราณ', buy:180, rent:36, upHouse:240, rentHouse:90, upHotel:440, rentHotel:300},//17
+  {type:'taxsmall', name:'ภาษีย่อย', amount:120},//18
+  {type:'property', name:'ถ้ำมังกร', buy:260, rent:48, upHouse:260, rentHouse:120, upHotel:460, rentHotel:360},//19
+  {type:'treasure', name:'สมบัติในบ้าน'},//20
+  {type:'property', name:'หอคอยเวทย์', buy:320, rent:60, upHouse:300, rentHouse:150, upHotel:500, rentHotel:420},//21
+  {type:'property', name:'ตลาดเวทย์ (รอบ2)', buy:460, rent:88, upHouse:360, rentHouse:220, upHotel:560, rentHotel:580},//22
+  {type:'corner', name:'ภาษีใหญ่', amount:300},//23
+  {type:'property', name:'บ่อคริสตัล', buy:480, rent:92, upHouse:380, rentHouse:230, upHotel:580, rentHotel:600},//24
+  {type:'property', name:'สวนลึกลับ', buy:360, rent:68, upHouse:320, rentHouse:170, upHotel:520, rentHotel:460},//25
+  {type:'fate', name:'ดวงดี-ดวงร้าย'},//26
+  {type:'property', name:'ค่ายคนแคระ', buy:340, rent:64, upHouse:300, rentHouse:160, upHotel:500, rentHotel:440},//27
+  {type:'treasure', name:'สมบัติในบ้าน'},//28
+  {type:'property', name:'เหมืองเงิน', buy:380, rent:72, upHouse:320, rentHouse:180, upHotel:520, rentHotel:480},//29
+  {type:'taxsmall', name:'ภาษีย่อย', amount:120},//30
+  {type:'property', name:'ตลาดลับ', buy:400, rent:76, upHouse:340, rentHouse:190, upHotel:540, rentHotel:500},//31
+  {type:'property', name:'ค่ายนักรบ', buy:440, rent:84, upHouse:360, rentHouse:210, upHotel:560, rentHotel:550},//32
+  {type:'property', name:'ถ้ำหินมานา', buy:500, rent:96, upHouse:380, rentHouse:240, upHotel:580, rentHotel:620},//33
+  {type:'corner', name:'เที่ยวไหนเที่ยวนั้น'},//34
+  {type:'treasure', name:'สมบัติในบ้าน'},//35
+  {type:'property', name:'ตลาดแสงจันทร์', buy:560, rent:120, upHouse:420, rentHouse:270, upHotel:620, rentHotel:720},//36
+  {type:'fate', name:'ดวงดี-ดวงร้าย'},//37
+  {type:'property', name:'ป่ามหัศจรรย์', buy:540, rent:110, upHouse:400, rentHouse:260, upHotel:600, rentHotel:680},//38
+  {type:'treasure', name:'สมบัติในบ้าน'},//39
+  {type:'property', name:'ท่าเรือโบราณ', buy:520, rent:100, upHouse:400, rentHouse:250, upHotel:600, rentHotel:650},//40
+  {type:'taxsmall', name:'ภาษีย่อย', amount:120},//41
+  {type:'property', name:'ปราสาทโบราณ', buy:420, rent:80, upHouse:340, rentHouse:200, upHotel:540, rentHotel:520},//42
+  {type:'treasure', name:'สมบัติในบ้าน'},//43
+  {type:'property', name:'เหมืองเงิน (พิเศษ)', buy:380, rent:72, upHouse:320, rentHouse:180, upHotel:520, rentHotel:480}//44
+];
+
+// treasure cards (สมบัติในบ้าน) - mild effects
+const TREASURE_CARDS = [
+  {text:'เจอเหรียญโบราณ ขายได้ +150', type:'money', amount:150},
+  {text:'ญาติให้ของขวัญ +100', type:'money', amount:100},
+  {text:'เก็บคูปองร้านอาหาร ไม่ต้องจ่ายค่าเช่า 1 เทิร์น', type:'coupon', amount:1},
+  {text:'ค่าซ่อมของในบ้าน -60', type:'money', amount:-60},
+  {text:'เจอของโบราณ +120', type:'money', amount:120},
+  {text:'จ่ายค่าทำความสะอาดบ้าน -40', type:'money', amount:-40},
+  {text:'ได้บัตรขนส่งฟรี ย้ายไป Start (รับเงิน)', type:'move', to:0},
+  {text:'ประกันบ้านจ่าย -80', type:'money', amount:-80},
+  {text:'พบไอเทมวิเศษขายได้ +200', type:'money', amount:200},
+  {text:'ได้รับการสนับสนุนจากเมือง +150', type:'money', amount:150}
+];
+
+// fate cards (ดวงดี-ดวงร้าย) - stronger effects
+const FATE_CARDS = [
+  {text:'ถูกล็อตเตอรี่ +400', type:'money', amount:400},
+  {text:'โดนโจรซุ่มจู่โจม -200', type:'money', amount:-200},
+  {text:'พบทางลัด ไปเตะ Start (รับเงิน)', type:'move', to:0},
+  {text:'รถพังต้องจ่าย -150', type:'money', amount:-150},
+  {text:'ถูกส่งไปคุก จ่ายหรือรอลุ้น', type:'jail'},
+  {text:'พบแผนที่สมบัติ +300', type:'money', amount:300},
+  {text:'โดนคดีจ่ายค่าปรับ -300', type:'money', amount:-300},
+  {text:'ได้รับมรดก +250', type:'money', amount:250},
+  {text:'จ่ายค่ารักษาพยาบาล -200', type:'money', amount:-200},
+  {text:'ได้รับการอุปถัมภ์ +200', type:'money', amount:200}
+];
+
+// ======= Game State =======
+const state = {
+  players: [
+    {id:1,name:'Player',pos:0,money:INITIAL_MONEY,skip:0,coupons:0,ai:false},
+    {id:2,name:'AI',pos:0,money:INITIAL_MONEY,skip:0,coupons:0,ai:true}
+  ],
+  current:0,
+  owned: {}, // pos -> ownerIndex (0/1)
+  houses: {}, // pos -> houseCount (0=none,1=house,2=hotel)
+  treasureDeck: shuffleArray([...TREASURE_CARDS]),
+  fateDeck: shuffleArray([...FATE_CARDS]),
+  logs: []
+};
+
+// ======= Utilities =======
+function shuffleArray(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a}
+function log(text){state.logs.unshift(text); renderLog();}
+function mod(n,m){return ((n%m)+m)%m}
+
+// ======= Build Board UI =======
+const boardEl = document.getElementById('board');
+const playersEl = document.getElementById('players');
+const propListEl = document.getElementById('propList');
+const logEl = document.getElementById('log');
+const currentPlayerEl = document.getElementById('currentPlayer');
+const statusEl = document.getElementById('status');
+const die1El = document.getElementById('die1');
+const die2El = document.getElementById('die2');
+const diceSumEl = document.getElementById('diceSum');
+
+function buildBoard(){
+  boardEl.innerHTML='';
+  // create 11x11 grid cells; place corner and outer path
+  const grid = [];
+  for(let r=0;r<11;r++){
+    for(let c=0;c<11;c++){
+      const idx = r*11+c;
+      const div = document.createElement('div');
+      div.className='cell';
+      // corners
+      if((r===0&&c===0)||(r===0&&c===10)||(r===10&&c===10)||(r===10&&c===0)){
+        div.classList.add('corner');
+        // map to corner positions 1,12,23,34 roughly
+        // We'll set content later
+      }
+      // center big
+      if(r>=3&&r<=7&&c>=3&&c<=7){
+        if(r===3&&c===3){/*top-left center*/}
+        div.classList.add('center');
+      }
+      div.style.gridRowStart=r+1;
+      div.style.gridColumnStart=c+1;
+      boardEl.appendChild(div);
+    }
+  }
+  // Now map our BOARD_MAP to outer path positions clockwise starting at top-left corner moving right
+  // compute border coords
+  const borderCoords = [];
+  for(let c=0;c<11;c++) borderCoords.push({r:0,c});
+  for(let r=1;r<11;r++) borderCoords.push({r,c:10});
+  for(let c=9;c>=0;c--) borderCoords.push({r:10,c});
+  for(let r=9;r>0;r--) borderCoords.push({r,c:0});
+  // take first 44 positions
+  for(let i=0;i<44;i++){
+    const pos = BOARD_MAP[i];
+    const bc = borderCoords[i];
+    // find cell element at gridRowStart, gridColumnStart
+    const sel = boardEl.querySelector(`.cell[style*="grid-row-start: ${bc.r+1}"]`);
+    // fallback search
+    const cell = Array.from(boardEl.children).find(ch => ch.style.gridRowStart===(bc.r+1).toString() && ch.style.gridColumnStart===(bc.c+1).toString());
+    if(!cell) continue;
+    cell.dataset.pos = i;
+    // fill content
+    cell.innerHTML = '';
+    if(pos.type==='corner'){
+      cell.classList.add('corner');
+      const el = document.createElement('div'); el.textContent = pos.name; el.style.fontWeight='700'; cell.appendChild(el);
+    } else if(pos.type==='property'){
+      cell.classList.add('property');
+      const t = document.createElement('div'); t.className='title'; t.textContent = pos.name; cell.appendChild(t);
+      const p = document.createElement('div'); p.className='price'; p.textContent = `ซื้อ ${pos.buy} | เช่า ${pos.rent}`; cell.appendChild(p);
+      const b = document.createElement('div'); b.className='bar'; b.style.background='linear-gradient(90deg,#6ee7b7,#60a5fa)'; cell.appendChild(b);
+    } else if(pos.type==='treasure' || pos.type==='fate' || pos.type==='taxsmall'){
+      const t = document.createElement('div'); t.className='title'; t.textContent = pos.name; cell.appendChild(t);
+      if(pos.type==='taxsmall'){ const p=document.createElement('div');p.className='price';p.textContent=`จ่าย ${pos.amount}`;cell.appendChild(p)}
+    }
+    cell.addEventListener('click', ()=>onClickCell(i));
+  }
+}
+
+buildBoard();
+
+// ======= Render UI =======
+function renderPlayers(){
+  playersEl.innerHTML='';
+  for(let i=0;i<state.players.length;i++){
+    const p = state.players[i];
+    const div = document.createElement('div'); div.className='player';
+    div.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div class='token ${i===0?'p1':'p2'}'>${i+1}</div><div><div style='font-weight:700'>${p.name}</div><div class='small'>Pos: ${p.pos+1} | Money: ${p.money}</div></div></div><div style='text-align:right'><div class='small'>Skip:${p.skip} | Coupon:${p.coupons}</div></div>`;
+    playersEl.appendChild(div);
+  }
+}
+
+function renderProps(){
+  propListEl.innerHTML='';
+  for(let i=0;i<BOARD_MAP.length;i++){
+    const pos = BOARD_MAP[i];
+    if(pos.type!=='property') continue;
+    const div = document.createElement('div'); div.className='prop-item';
+    const owner = state.owned[i]!==undefined?`Owner: P${state.owned[i]+1}`:'Owner: -';
+    const house = state.houses[i]===1? 'House' : state.houses[i]===2 ? 'Hotel' : '-';
+    div.textContent = `${i+1}. ${pos.name} | Buy:${pos.buy} | Rent:${pos.rent} | ${owner} | ${house}`;
+    propListEl.appendChild(div);
+  }
+}
+
+function renderLog(){
+  logEl.innerHTML='';
+  for(let i=0;i<state.logs.length;i++){
+    const p = document.createElement('div'); p.textContent = state.logs[i]; logEl.appendChild(p);
+  }
+}
+
+function renderTokens(){
+  // clear tokens
+  const cells = boardEl.querySelectorAll('.cell');
+  cells.forEach(c=>{ const wrap = c.querySelector('.tokens'); if(wrap) wrap.remove(); });
+  for(let i=0;i<state.players.length;i++){
+    const p = state.players[i];
+    const cell = boardEl.querySelector(`.cell[data-pos='${p.pos}']`);
+    if(!cell) continue;
+    let wrap = cell.querySelector('.tokens'); if(!wrap){ wrap = document.createElement('div'); wrap.className='tokens'; cell.appendChild(wrap); }
+    const token = document.createElement('div'); token.className='token ' + (i===0?'p1':'p2'); token.textContent = i+1; wrap.appendChild(token);
+  }
+}
+
+function refreshAll(){
+  currentPlayerEl.textContent = state.players[state.current].name + (state.players[state.current].ai ? ' (AI)' : '');
+  statusEl.textContent = `Turn ${state.current+1}`;
+  renderPlayers(); renderProps(); renderLog(); renderTokens();
+}
+
+refreshAll();
+
+// ======= Core Mechanics =======
+let rolling=false;
+
+function rollDice(){
+  if(rolling) return; rolling=true;
+  const d1 = Math.floor(Math.random()*6)+1;
+  const d2 = Math.floor(Math.random()*6)+1;
+  die1El.textContent = d1; die2El.textContent = d2; diceSumEl.textContent = `${d1+d2}`;
+  log(`${state.players[state.current].name} ทอยได้ ${d1}+${d2} = ${d1+d2}`);
+  setTimeout(()=>{
+    moveCurrentPlayer(d1+d2);
+    rolling=false;
+  },450);
+}
+
+function moveCurrentPlayer(steps){
+  const p = state.players[state.current];
+  // handle skip due to jail
+  if(p.skip>0){ p.skip--; log(`${p.name} งดเล่น ${p.skip} เทิร์นที่เหลือ`); endTurn(); return; }
+  const oldPos = p.pos;
+  p.pos = (p.pos + steps) % BOARD_MAP.length;
+  log(`${p.name} เคลื่อนจาก ${oldPos+1} ไป ${p.pos+1} (${BOARD_MAP[p.pos].name})`);
+  // pass Start check
+  if(p.pos < oldPos){ p.money += START_BONUS; log(`${p.name} ผ่าน Start ได้ +${START_BONUS}`); }
+  handleLanding(p.pos);
+  refreshAll();
+}
+
+function handleLanding(pos){
+  const tile = BOARD_MAP[pos];
+  const playerIdx = state.current;
+  const p = state.players[playerIdx];
+  if(tile.type==='property'){
+    if(state.owned[pos]===undefined){
+      log(`${tile.name} ไม่มีเจ้าของ`);
+      // auto-offer to buy for human
+      if(!p.ai){ statusEl.textContent='คุณสามารถซื้อหรือข้าม'; }
+    } else if(state.owned[pos]!==playerIdx){
+      // pay rent
+      const ownerIdx = state.owned[pos];
+      let charge = tile.rent;
+      if(state.houses[pos]===1) charge = tile.rentHouse;
+      if(state.houses[pos]===2) charge = tile.rentHotel;
+      p.money -= charge;
+      state.players[ownerIdx].money += charge;
+      log(`${p.name} จ่ายค่าเช่า ${charge} ให้ ${state.players[ownerIdx].name}`);
+    } else {
+      log(`${p.name} มาที่ที่ดินของตัวเอง`);
+    }
+  } else if(tile.type==='treasure'){
+    drawTreasure();
+  } else if(tile.type==='fate'){
+    drawFate();
+  } else if(tile.type==='taxsmall'){
+    p.money -= tile.amount; log(`${p.name} จ่ายภาษีย่อย ${tile.amount}`);
+  } else if(tile.type==='corner'){
+    if(tile.name==='คุก'){ p.skip = 2; log(`${p.name} ถูกจับคุก งดเล่น 2 เทิร์น`); }
+    else if(tile.name==='เที่ยวไหนเที่ยวนั้น'){ log(`${p.name} อยู่โซนเที่ยว เลือกไปที่ที่ต้องการด้วยปุ่ม 'เที่ยว'`); }
+    else if(tile.name==='ภาษีใหญ่'){ p.money -= tile.amount; log(`${p.name} จ่ายภาษีใหญ่ ${tile.amount}`); }
+  }
+  checkBankruptcy();
+}
+
+function checkBankruptcy(){
+  for(let i=0;i<state.players.length;i++){
+    if(state.players[i].money < 0){
+      alert(`${state.players[i].name} เงินหมด เกมจบ!`);
+      log(`${state.players[i].name} หมดตัว`);
+      // disable buttons
+      document.getElementById('rollBtn').disabled=true;
+      document.getElementById('buyBtn').disabled=true;
+      document.getElementById('upgradeBtn').disabled=true;
+    }
+  }
+}
+
+function endTurn(){
+  // advance turn
+  state.current = (state.current+1) % state.players.length;
+  log(`เปลี่ยนเป็น ${state.players[state.current].name}`);
+  refreshAll();
+  // if AI, trigger AI action after delay
+  if(state.players[state.current].ai){ setTimeout(()=>aiTakeTurn(),600); }
+}
+
+// ======= Buying & Upgrading =======
+function buyCurrent(){
+  const p = state.players[state.current]; const pos = p.pos; const tile = BOARD_MAP[pos];
+  if(tile.type!=='property'){ alert('ช่องนี้ซื้อไม่ได้'); return; }
+  if(state.owned[pos]!==undefined){ alert('มีเจ้าของแล้ว'); return; }
+  if(p.money < tile.buy){ alert('เงินไม่พอ'); return; }
+  p.money -= tile.buy; state.owned[pos]=state.current; state.houses[pos]=0; log(`${p.name} ซื้อ ${tile.name} ในราคา ${tile.buy}`); refreshAll();
+}
+
+function upgradeCurrent(){
+  const p = state.players[state.current]; const pos = p.pos; const tile = BOARD_MAP[pos];
+  if(tile.type!=='property'){ alert('ช่องนี้อัปเกรดไม่ได้'); return; }
+  if(state.owned[pos]!==state.current){ alert('ไม่ได้เป็นเจ้าของ'); return; }
+  const currentHouse = state.houses[pos]||0;
+  if(currentHouse===0){ // buy house
+    if(p.money < tile.upHouse){ alert('เงินไม่พอซื้อบ้าน'); return; }
+    p.money -= tile.upHouse; state.houses[pos]=1; log(`${p.name} สร้างบ้านที่ ${tile.name} จ่าย ${tile.upHouse}`); refreshAll();
+  } else if(currentHouse===1){ // upgrade to hotel
+    if(p.money < tile.upHotel){ alert('เงินไม่พออัปเป็นโรงแรม'); return; }
+    p.money -= tile.upHotel; state.houses[pos]=2; log(`${p.name} อัปเกรดเป็นโรงแรมที่ ${tile.name} จ่าย ${tile.upHotel}`); refreshAll();
+  } else { alert('อัปเกรดเต็มแล้ว'); }
+}
+
+// ======= Cards =======
+function drawTreasure(){
+  if(state.treasureDeck.length===0) state.treasureDeck = shuffleArray([...TREASURE_CARDS]);
+  const card = state.treasureDeck.pop(); log(`จั่วสมบัติ: ${card.text}`);
+  applyCard(card);
+}
+function drawFate(){
+  if(state.fateDeck.length===0) state.fateDeck = shuffleArray([...FATE_CARDS]);
+  const card = state.fateDeck.pop(); log(`จั่วดวง: ${card.text}`);
+  applyCard(card);
+}
+function applyCard(card){
+  const p = state.players[state.current];
+  if(card.type==='money') { p.money += card.amount; log(`${p.name} เงินเปลี่ยน ${card.amount} => ตอนนี้ ${p.money}`); }
+  else if(card.type==='coupon'){ p.coupons += card.amount; log(`${p.name} ได้คูปอง ${card.amount}`); }
+  else if(card.type==='move'){ p.pos = card.to; log(`${p.name} ย้ายไปที่ ${card.to+1} (${BOARD_MAP[card.to].name})`); if(card.to===0) { p.money+=START_BONUS; log(`${p.name} ได้โบนัสผ่าน Start +${START_BONUS}`);} }
+  else if(card.type==='jail'){ p.pos = 11; p.skip = 2; log(`${p.name} ถูกส่งคุก งดเล่น 2 เทิร์น`); }
+  refreshAll();
+}
+
+// ======= Free Trip =======
+function freeTrip(){
+  const p = state.players[state.current];
+  // allow selecting a property position
+  const choices = BOARD_MAP.map((b,i)=>({i,b})).filter(x=>x.b.type!=='treasure' && x.b.type!=='fate');
+  const choiceStr = choices.map(x=>`${x.i+1}:${x.b.name}`).slice(0,44).join('\n');
+  const sel = prompt('พิมพ์เลขช่องที่ต้องการไป (1-44)\nตัวอย่าง:\n'+choiceStr);
+  const idx = Number(sel)-1;
+  if(isNaN(idx) || idx<0 || idx>=BOARD_MAP.length) { alert('เลือกไม่ถูกต้อง'); return; }
+  p.pos = idx; log(`${p.name} เที่ยวไปที่ ${idx+1} (${BOARD_MAP[idx].name})`);
+  if(p.pos===0){ p.money += START_BONUS; log(`${p.name} ผ่าน Start ได้ +${START_BONUS}`); }
+  handleLanding(p.pos); refreshAll();
+}
+
+// ======= Simple AI =======
+function aiTakeTurn(){
+  const aiIdx = state.current; const ai = state.players[aiIdx];
+  // if in jail: decide to pay or wait
+  if(ai.skip>0){ ai.skip--; log(`${ai.name} (AI) งดเล่น ${ai.skip} เทิร์น`); endTurn(); return; }
+  // roll dice
+  const d1 = Math.floor(Math.random()*6)+1; const d2 = Math.floor(Math.random()*6)+1; const sum = d1+d2;
+  die1El.textContent=d1; die2El.textContent=d2; diceSumEl.textContent=sum; log(`${ai.name} (AI) ทอยได้ ${d1}+${d2}`);
+  ai.pos = (ai.pos + sum) % BOARD_MAP.length;
+  if(ai.pos < (ai.pos - sum + BOARD_MAP.length) % BOARD_MAP.length){} // pass start handled later
+  // pass start detection
+  // crude: if pos < previous => passed
+  // Here compute previous
+  // simpler: compute previous
+  const prev = mod(ai.pos - sum, BOARD_MAP.length);
+  if(ai.pos < prev){ ai.money += START_BONUS; log(`${ai.name} (AI) ผ่าน Start ได้ +${START_BONUS}`); }
+  log(`${ai.name} (AI) ไปที่ ${ai.pos+1} (${BOARD_MAP[ai.pos].name})`);
+  // landing logic simplified: buy if affordable and no owner and ai has reserve
+  const tile = BOARD_MAP[ai.pos];
+  if(tile.type==='property'){
+    if(state.owned[ai.pos]===undefined){
+      // AI decision: buy if money > buy + upHouse + reserve
+      const reserve = 300; // keep some cash
+      if(ai.money > tile.buy + tile.upHouse + reserve){ ai.money -= tile.buy; state.owned[ai.pos]=aiIdx; state.houses[ai.pos]=0; log(`${ai.name} (AI) ซื้อ ${tile.name} ราคา ${tile.buy}`); }
+      else log(`${ai.name} (AI) ตัดสินใจไม่ซื้อ`);
+    } else if(state.owned[ai.pos]!==aiIdx){
+      const owner = state.owned[ai.pos]; let charge = tile.rent; if(state.houses[ai.pos]===1) charge = tile.rentHouse; if(state.houses[ai.pos]===2) charge = tile.rentHotel; ai.money -= charge; state.players[owner].money += charge; log(`${ai.name} (AI) จ่ายค่าเช่า ${charge} ให้ ${state.players[owner].name}`);
+    } else {
+      // possibly upgrade
+      const h = state.houses[ai.pos]||0;
+      if(h===0 && ai.money > tile.upHouse + 200){ ai.money -= tile.upHouse; state.houses[ai.pos]=1; log(`${ai.name} (AI) สร้างบ้านที่ ${tile.name}`); }
+      else if(h===1 && ai.money > tile.upHotel + 300){ ai.money -= tile.upHotel; state.houses[ai.pos]=2; log(`${ai.name} (AI) อัปเป็นโรงแรมที่ ${tile.name}`); }
+    }
+  } else if(tile.type==='treasure'){ drawTreasure(); }
+  else if(tile.type==='fate'){ drawFate(); }
+  else if(tile.type==='taxsmall'){ ai.money -= tile.amount; log(`${ai.name} (AI) จ่ายภาษีย่อย ${tile.amount}`); }
+  else if(tile.type==='corner'){ if(tile.name==='คุก'){ ai.skip=2; log(`${ai.name} (AI) ถูกคุก`); } if(tile.name==='ภาษีใหญ่'){ ai.money -= tile.amount; log(`${ai.name} (AI) จ่ายภาษีใหญ่ ${tile.amount}`); } }
+  refreshAll();
+  checkBankruptcy();
+  setTimeout(()=> endTurn(),700);
+}
+
+// ======= Events =======
+document.getElementById('rollBtn').addEventListener('click', ()=>{
+  const p = state.players[state.current]; if(p.ai) return; rollDice();
+});
+document.getElementById('endBtn').addEventListener('click', ()=>{ endTurn(); });
+document.getElementById('buyBtn').addEventListener('click', ()=>{ buyCurrent(); });
+document.getElementById('upgradeBtn').addEventListener('click', ()=>{ upgradeCurrent(); });
+document.getElementById('drawTreasure').addEventListener('click', ()=>{ drawTreasure(); });
+document.getElementById('drawFate').addEventListener('click', ()=>{ drawFate(); });
+document.getElementById('freeTripBtn').addEventListener('click', ()=>{ freeTrip(); });
+
+// cell click
+function onClickCell(i){
+  const tile = BOARD_MAP[i];
+  let msg = `${i+1}. ${tile.name} \nType: ${tile.type}`;
+  if(tile.type==='property') msg += `\nBuy: ${tile.buy} | Rent: ${tile.rent} | House:${tile.upHouse}|Hotel:${tile.upHotel}`;
+  if(tile.type==='taxsmall') msg += `\nAmount: ${tile.amount}`;
+  alert(msg);
+}
+
+// initial log
+log('เริ่มเกม: ผู้เล่นทุกคนเริ่มที่เงิน ' + INITIAL_MONEY);
+refreshAll();
+
+</script>
+</body>
+</html>
